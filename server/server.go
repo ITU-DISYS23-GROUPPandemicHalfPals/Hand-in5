@@ -29,7 +29,7 @@ func Server() *server {
 	return &server{
 		HighestBid: 50,
 
-		Time: 10,
+		Time: 120,
 		Done: false,
 	}
 }
@@ -79,7 +79,7 @@ func (s *server) Result(_ context.Context, request *auction.ResultRequest) (*auc
 		return &auction.ResultResponse{
 			Event: &auction.ResultResponse_Status{
 				Status: &auction.ResultResponse_StatusMessage{
-					Time:       s.Time,
+					Time:       int64(s.Time),
 					HighestBid: int64(s.HighestBid),
 				},
 			},
@@ -90,6 +90,10 @@ func (s *server) Result(_ context.Context, request *auction.ResultRequest) (*auc
 func (s *server) auction(bid *auction.BidRequest) error {
 	if s.Done {
 		return fmt.Errorf("auction is done")
+	}
+
+	if bid.Id == int32(s.HighestBidderId) {
+		return fmt.Errorf("you can not raise your own bid")
 	}
 
 	s.BidMutex.Lock()
@@ -109,7 +113,6 @@ func (s *server) timer() {
 	for s.Time > 0 {
 		time.Sleep(time.Second)
 		s.Time--
-		log.Print(s.Time)
 	}
 
 	s.Done = true

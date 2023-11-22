@@ -21,7 +21,7 @@ message ResultResponse {
     }
     
     message StatusMessage {
-        float time = 1;
+        int64 time = 1;
         int64 highestBid = 2;
     }
     
