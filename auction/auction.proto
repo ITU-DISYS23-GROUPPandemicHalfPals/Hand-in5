@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package auction;
+
+option go_package = "auction/auction";
+
+service Auction {
+
+}
