@@ -5,17 +5,18 @@ package auction;
 option go_package = "auction/auction";
 
 message BidRequest {
-    int64 amount = 1;
+    int32 id = 1;
+    string name = 2;
+    int64 amount = 3;
 }
 
-message BidResponse {
-    string ack = 1;
-}
+message BidResponse {}
 
 message ResultRequest {}
 
 message ResultResponse {
     int64 outcome = 1;
+
 }
 
 service Auction {
