@@ -15,8 +15,20 @@ message BidResponse {}
 message ResultRequest {}
 
 message ResultResponse {
-    int64 outcome = 1;
-
+    oneof event {
+        StatusMessage status = 1;
+        WinnerMessage winner = 2;
+    }
+    
+    message StatusMessage {
+        float time = 1;
+        int64 highestBid = 2;
+    }
+    
+    message WinnerMessage {
+        string name = 1;
+        int64 amount = 2;
+    }
 }
 
 service Auction {

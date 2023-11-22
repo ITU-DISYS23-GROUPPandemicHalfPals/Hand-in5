@@ -3,7 +3,6 @@ package main
 import (
 	"auction/auction"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -17,8 +16,8 @@ type server struct {
 	HighestBidderName string
 	HighestBid        int
 
-	TimeLeft float32
-	Done     bool
+	Time float32
+	Done bool
 
 	BidMutex sync.Mutex
 
@@ -63,9 +62,23 @@ func (s *server) Bid(_ context.Context, request *auction.BidRequest) (*auction.B
 
 func (s *server) Result(_ context.Context, request *auction.ResultRequest) (*auction.ResultResponse, error) {
 	if s.Done {
-
+		return &auction.ResultResponse{
+			Event: &auction.ResultResponse_Winner{
+				Winner: &auction.ResultResponse_WinnerMessage{
+					Name:   s.HighestBidderName,
+					Amount: int64(s.HighestBid),
+				},
+			},
+		}, nil
 	} else {
-
+		return &auction.ResultResponse{
+			Event: &auction.ResultResponse_Status{
+				Status: &auction.ResultResponse_StatusMessage{
+					Time:       s.Time,
+					HighestBid: int64(s.HighestBid),
+				},
+			},
+		}, nil
 	}
 }
 
@@ -75,7 +88,7 @@ func (s *server) timer() {
 
 func (s *server) auction(bid *auction.BidRequest) error {
 	if s.Done {
-		return errors.New("Auction is done.")
+		return fmt.Errorf("auction is done")
 	}
 
 	s.BidMutex.Lock()
@@ -85,7 +98,7 @@ func (s *server) auction(bid *auction.BidRequest) error {
 		s.HighestBidderName = bid.Name
 		s.HighestBid = int(bid.Amount)
 	} else {
-		return errors.New(fmt.Sprintf("Your bid has to be higher than the biggest bid. Your bid: %d. Highest bid: %d.", bid.Amount, s.HighestBid))
+		return fmt.Errorf("your bid has to be higher than the biggest bid - your bid: %d - highest bid: %d", bid.Amount, s.HighestBid)
 	}
 
 	return nil
