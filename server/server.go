@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 )
@@ -25,7 +26,12 @@ type server struct {
 }
 
 func Server() *server {
-	return &server{}
+	return &server{
+		HighestBid: 50,
+
+		Time: 10,
+		Done: false,
+	}
 }
 
 func main() {
@@ -42,12 +48,11 @@ func (s *server) server() {
 		log.Fatalf("Failed to listen: %s", error)
 	}
 
-	s.timer()
+	go s.timer()
 
 	error = server.Serve(listener)
 	if error != nil {
 		log.Fatalf("Failed to serve: %s", error)
-
 	}
 }
 
@@ -82,10 +87,6 @@ func (s *server) Result(_ context.Context, request *auction.ResultRequest) (*auc
 	}
 }
 
-func (s *server) timer() {
-	s.Done = true
-}
-
 func (s *server) auction(bid *auction.BidRequest) error {
 	if s.Done {
 		return fmt.Errorf("auction is done")
@@ -102,6 +103,16 @@ func (s *server) auction(bid *auction.BidRequest) error {
 	}
 
 	return nil
+}
+
+func (s *server) timer() {
+	for s.Time > 0 {
+		time.Sleep(time.Second)
+		s.Time--
+		log.Print(s.Time)
+	}
+
+	s.Done = true
 }
 
 /*
