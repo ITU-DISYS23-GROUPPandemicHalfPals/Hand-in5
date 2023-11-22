@@ -4,6 +4,34 @@ package auction;
 
 option go_package = "auction/auction";
 
-service Auction {
+message BidRequest {
+    int64 amount = 1;
+}
 
+message BidResponse {
+    string ack = 1;
+}
+
+message ResultRequest {}
+
+message ResultResponse {
+    int64 outcome = 1;
+}
+
+service Auction {
+    rpc Bid(BidRequest) returns (BidResponse);
+    rpc Result(ResultRequest) returns (ResultResponse);
+}
+
+message ElectionMessage {}
+
+message CoordinatorMessage {
+    int32 port = 1;
+}
+
+message Response { }
+
+service Election {
+    rpc Election(ElectionMessage) returns (Response);
+    rpc Coordinator(CoordinatorMessage) returns (Response);
 }
