@@ -1,1 +1,5 @@
-# Hand-in5
+# Auction
+## Running the application
+### Server
+
+### Client
