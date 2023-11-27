@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -38,31 +39,26 @@ func main() {
 }
 
 func (c *client) client() {
-	ctx := context.Background()
+	ctx, err := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	var serverPort = 5000
-	var errors = ""
 
-	for serverPort < 5002 {
-		connection, error := grpc.Dial(":"+strconv.Itoa(serverPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	for serverPort <= 5002 {
+		connection, _ := grpc.DialContext(ctx, ":"+strconv.Itoa(serverPort),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
 
-		if error != nil {
-			log.Fatalf("Connecting to server failed: %s", error)
-		}
-
-		if error == nil {
+		if err == nil {
 			c.AuctionClient = auction.NewAuctionClient(connection)
 
-			print(error)
 			c.run(ctx)
 			for {
 
 			}
 		}
 		serverPort++
-		errors = error.Error()
 	}
 
-	log.Fatalf("Connecting to server failed: %s", errors)
+	log.Fatalf("Connection failed utterly")
 
 }
 
