@@ -39,26 +39,30 @@ func main() {
 }
 
 func (c *client) client() {
-	ctx, err := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	ctx := context.Background()
 	var serverPort = 5000
 
 	for serverPort <= 5002 {
-		connection, _ := grpc.DialContext(ctx, ":"+strconv.Itoa(serverPort),
+		connection, err := grpc.Dial(":"+strconv.Itoa(serverPort),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+			grpc.WithTimeout(time.Second),
 		)
 
 		if err == nil {
 			c.AuctionClient = auction.NewAuctionClient(connection)
+			log.Printf("Connection established to port " + strconv.Itoa(serverPort))
 
 			c.run(ctx)
 			for {
 
 			}
 		}
+		log.Printf("Couldn't find port " + strconv.Itoa(serverPort))
 		serverPort++
 	}
 
-	log.Fatalf("Connection failed utterly")
+	log.Fatalf("Failed to connect to any server")
 
 }
 
