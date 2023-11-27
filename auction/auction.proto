@@ -47,4 +47,5 @@ message Response { }
 service Election {
     rpc Election(ElectionMessage) returns (Response);
     rpc Coordinator(CoordinatorMessage) returns (Response);
+    
 }

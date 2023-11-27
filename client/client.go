@@ -103,9 +103,9 @@ func (c *client) bid(ctx context.Context, bidAmount int) {
 
 func (c *client) connectToServer(ctx context.Context) {
 
-	var serverPort = 5000
+	var serverPort = 5002
 
-	for serverPort <= 5002 {
+	for serverPort >= 5000 {
 		connection, err := grpc.Dial(":"+strconv.Itoa(serverPort),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithBlock(),
@@ -119,7 +119,7 @@ func (c *client) connectToServer(ctx context.Context) {
 			c.run(ctx)
 		}
 		log.Printf("Couldn't find port " + strconv.Itoa(serverPort))
-		serverPort++
+		serverPort--
 	}
 
 	log.Fatalf("Failed to connect to any server")

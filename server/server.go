@@ -3,16 +3,22 @@ package main
 import (
 	"auction/auction"
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 )
 
+var port = flag.Int("port", 5002, "The port of the node")
+
 type server struct {
+	Port int
+
 	HighestBidderId   int
 	HighestBidderName string
 	HighestBid        int
@@ -25,8 +31,9 @@ type server struct {
 	auction.UnimplementedAuctionServer
 }
 
-func Server() *server {
+func Server(port int) *server {
 	return &server{
+		Port:       port,
 		HighestBid: 50,
 
 		Time: 120,
@@ -35,7 +42,9 @@ func Server() *server {
 }
 
 func main() {
-	s := Server()
+	flag.Parse()
+
+	s := Server(*port)
 	s.server()
 }
 
@@ -43,7 +52,7 @@ func (s *server) server() {
 	server := grpc.NewServer()
 	auction.RegisterAuctionServer(server, s)
 
-	listener, error := net.Listen("tcp", ":5001")
+	listener, error := net.Listen("tcp", ":"+strconv.Itoa(s.Port))
 	if error != nil {
 		log.Fatalf("Failed to listen: %s", error)
 	}
@@ -93,7 +102,7 @@ func (s *server) auction(bid *auction.BidRequest) error {
 	}
 
 	if bid.Id == int32(s.HighestBidderId) {
-		return fmt.Errorf("you can not raise your own bid")
+		return fmt.Errorf("you cannot raise your own bid")
 	}
 
 	s.BidMutex.Lock()
