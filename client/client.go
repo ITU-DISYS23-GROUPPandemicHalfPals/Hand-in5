@@ -40,30 +40,12 @@ func main() {
 
 func (c *client) client() {
 	ctx := context.Background()
-	var serverPort = 5000
 
-	for serverPort <= 5002 {
-		connection, err := grpc.Dial(":"+strconv.Itoa(serverPort),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
-			grpc.WithTimeout(time.Second),
-		)
+	c.connectToServer(ctx)
 
-		if err == nil {
-			c.AuctionClient = auction.NewAuctionClient(connection)
-			log.Printf("Connection established to port " + strconv.Itoa(serverPort))
+	for {
 
-			c.run(ctx)
-			for {
-
-			}
-		}
-		log.Printf("Couldn't find port " + strconv.Itoa(serverPort))
-		serverPort++
 	}
-
-	log.Fatalf("Failed to connect to any server")
-
 }
 
 func (c *client) run(ctx context.Context) {
@@ -92,7 +74,8 @@ func (c *client) run(ctx context.Context) {
 func (c *client) result(ctx context.Context) {
 	response, error := c.AuctionClient.Result(ctx, &auction.ResultRequest{})
 	if error != nil {
-		log.Print(error)
+		log.Print("Connection lost - Attempting to reconnect")
+		c.connectToServer(ctx)
 		return
 	}
 
@@ -111,8 +94,34 @@ func (c *client) bid(ctx context.Context, bidAmount int) {
 		Amount: int64(bidAmount),
 	})
 	if error != nil {
-		log.Print(error)
+		log.Print("Connection lost - Attempting to reconnect")
+		c.connectToServer(ctx)
 	} else {
 		log.Print("Successfully placed bid")
 	}
+}
+
+func (c *client) connectToServer(ctx context.Context) {
+
+	var serverPort = 5000
+
+	for serverPort <= 5002 {
+		connection, err := grpc.Dial(":"+strconv.Itoa(serverPort),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+			grpc.WithTimeout(3*time.Second),
+		)
+
+		if err == nil {
+			c.AuctionClient = auction.NewAuctionClient(connection)
+			log.Printf("Connection established to port " + strconv.Itoa(serverPort))
+
+			c.run(ctx)
+		}
+		log.Printf("Couldn't find port " + strconv.Itoa(serverPort))
+		serverPort++
+	}
+
+	log.Fatalf("Failed to connect to any server")
+
 }
