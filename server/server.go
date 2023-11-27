@@ -12,12 +12,15 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var port = flag.Int("port", 5002, "The port of the node")
 
 type server struct {
-	Port int
+	Port            int
+	CoordinatorPort int
+	Ports           []int
 
 	HighestBidderId   int
 	HighestBidderName string
@@ -29,6 +32,11 @@ type server struct {
 	BidMutex sync.Mutex
 
 	auction.UnimplementedAuctionServer
+
+	ElectionChannel chan bool
+
+	Servers       map[int]auction.ElectionClient
+	BiggerServers map[int]auction.ElectionClient
 }
 
 func Server(port int) *server {
@@ -44,8 +52,11 @@ func Server(port int) *server {
 func main() {
 	flag.Parse()
 
+	ctx := context.Background()
 	s := Server(*port)
-	s.server()
+
+	go s.server()
+	s.client(ctx)
 }
 
 func (s *server) server() {
@@ -97,6 +108,11 @@ func (s *server) Result(_ context.Context, request *auction.ResultRequest) (*auc
 }
 
 func (s *server) auction(bid *auction.BidRequest) error {
+
+	if s.Port != s.CoordinatorPort {
+		return fmt.Errorf("This is a backup server")
+	}
+
 	if s.Done {
 		return fmt.Errorf("auction is done")
 	}
@@ -127,7 +143,8 @@ func (s *server) timer() {
 	s.Done = true
 }
 
-/*
+// Election server section ------------------------------------------------------------------------------------------
+
 func (s *server) Election(_ context.Context, request *auction.ElectionMessage) (*auction.Response, error) {
 	s.ElectionChannel <- true
 
@@ -150,7 +167,7 @@ func (s *server) dialServers() {
 		time.Sleep(time.Second)
 
 		for _, port := range s.Ports {
-			_, ok := s.Clients[port]
+			_, ok := s.Servers[port]
 
 			if ok {
 				continue
@@ -161,12 +178,12 @@ func (s *server) dialServers() {
 				continue
 			}
 
-			client := auction.NewElectionClient(connection)
+			server := auction.NewElectionClient(connection)
 
-			s.Clients[port] = client
+			s.Servers[port] = server
 
 			if port > s.Port {
-				s.BiggerClients[port] = client
+				s.BiggerServers[port] = server
 			}
 		}
 	}
@@ -181,7 +198,7 @@ func (s *server) broadcastElection(ctx context.Context) {
 
 func (s *server) startElection(ctx context.Context) {
 	response := false
-	for _, client := range s.BiggerClients {
+	for _, client := range s.BiggerServers {
 		ctx, cancel := context.WithTimeout(ctx, time.Second)
 		_, error := client.Election(ctx, &auction.ElectionMessage{})
 
@@ -197,11 +214,10 @@ func (s *server) startElection(ctx context.Context) {
 			Port: int32(s.Port),
 		}
 
-		for _, client := range s.Clients {
+		for _, client := range s.Servers {
 			ctx, cancel := context.WithTimeout(ctx, time.Second)
 			_, _ = client.Coordinator(ctx, coordinatorMessage)
 			cancel()
 		}
 	}
 }
-*/
