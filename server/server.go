@@ -43,7 +43,7 @@ func (s *server) server() {
 	server := grpc.NewServer()
 	auction.RegisterAuctionServer(server, s)
 
-	listener, error := net.Listen("tcp", ":5000")
+	listener, error := net.Listen("tcp", ":5001")
 	if error != nil {
 		log.Fatalf("Failed to listen: %s", error)
 	}

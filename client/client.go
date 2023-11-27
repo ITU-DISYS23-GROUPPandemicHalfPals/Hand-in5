@@ -39,15 +39,31 @@ func main() {
 
 func (c *client) client() {
 	ctx := context.Background()
+	var serverPort = 5000
+	var errors = ""
 
-	connection, error := grpc.Dial(":5000", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if error != nil {
-		log.Fatalf("Connecting to server failed: %s", error)
+	for serverPort < 5002 {
+		connection, error := grpc.Dial(":"+strconv.Itoa(serverPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+		if error != nil {
+			log.Fatalf("Connecting to server failed: %s", error)
+		}
+
+		if error == nil {
+			c.AuctionClient = auction.NewAuctionClient(connection)
+
+			print(error)
+			c.run(ctx)
+			for {
+
+			}
+		}
+		serverPort++
+		errors = error.Error()
 	}
 
-	c.AuctionClient = auction.NewAuctionClient(connection)
+	log.Fatalf("Connecting to server failed: %s", errors)
 
-	c.run(ctx)
 }
 
 func (c *client) run(ctx context.Context) {
