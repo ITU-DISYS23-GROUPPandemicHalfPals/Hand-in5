@@ -107,7 +107,7 @@ func (s *server) Bid(ctx context.Context, request *auction.BidRequest) (*auction
 			err = error
 		}
 
-		if err != nil {
+		if err != nil || !ok {
 			log.Print("No coordinator found: Starting new election")
 			s.startElection(ctx)
 		}
@@ -173,6 +173,7 @@ func (s *server) auction(bid *auction.BidRequest) error {
 
 func (s *server) timer() {
 	for s.Time > 0 {
+
 		time.Sleep(time.Second)
 		s.Time--
 	}
@@ -265,4 +266,16 @@ func (s *server) startElection(ctx context.Context) {
 		}
 		log.Printf(strconv.Itoa(s.CoordinatorPort))
 	}
+}
+
+func (s *server) Update(ctx context.Context, request *auction.UpdateMessage) (*auction.Response, error) {
+
+	if &s.Port != &s.CoordinatorPort {
+		s.Time = float32(request.Time)
+		s.HighestBid = int(request.HighestBid)
+		s.HighestBidderId = int(request.HighestBidderId)
+		s.HighestBidderName = request.GetHighestBidderName()
+	}
+
+	return &auction.Response{}, nil
 }

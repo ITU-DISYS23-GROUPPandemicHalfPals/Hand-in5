@@ -42,10 +42,17 @@ message CoordinatorMessage {
     int32 port = 1;
 }
 
+message UpdateMessage {
+    int32 time = 1;
+    int32 highestBid = 2;
+    int32 highestBidderId = 3;
+    string highestBidderName = 4; 
+}
+
 message Response { }
 
 service Election {
     rpc Election(ElectionMessage) returns (Response);
     rpc Coordinator(CoordinatorMessage) returns (Response);
-    
+    rpc Update(UpdateMessage) returns (Response);
 }
