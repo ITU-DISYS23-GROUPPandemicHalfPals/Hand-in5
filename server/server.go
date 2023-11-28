@@ -32,6 +32,7 @@ type server struct {
 	BidMutex sync.Mutex
 
 	auction.UnimplementedAuctionServer
+	auction.UnimplementedElectionServer
 
 	ElectionChannel chan bool
 
@@ -40,12 +41,26 @@ type server struct {
 }
 
 func Server(port int) *server {
+	var ports []int
+
+	for i := 5000; i <= 5002; i++ {
+		ports = append(ports, i)
+	}
+
 	return &server{
-		Port:       port,
+		Port:            port,
+		CoordinatorPort: 0,
+		Ports:           ports,
+
 		HighestBid: 50,
 
 		Time: 120,
 		Done: false,
+
+		ElectionChannel: make(chan bool, 10),
+
+		Servers:       make(map[int]auction.ElectionClient),
+		BiggerServers: make(map[int]auction.ElectionClient),
 	}
 }
 
@@ -61,7 +76,9 @@ func main() {
 
 func (s *server) server() {
 	server := grpc.NewServer()
+
 	auction.RegisterAuctionServer(server, s)
+	auction.RegisterElectionServer(server, s)
 
 	listener, error := net.Listen("tcp", ":"+strconv.Itoa(s.Port))
 	if error != nil {
@@ -76,7 +93,25 @@ func (s *server) server() {
 	}
 }
 
-func (s *server) Bid(_ context.Context, request *auction.BidRequest) (*auction.BidResponse, error) {
+func (s *server) Bid(ctx context.Context, request *auction.BidRequest) (*auction.BidResponse, error) {
+
+	if s.Port != s.CoordinatorPort {
+
+		log.Print("Attempting to connect to coordinator")
+		coordinator := s.Servers[s.CoordinatorPort]
+		_, error := coordinator.Election(ctx, &auction.ElectionMessage{})
+
+		if error != nil {
+			log.Print("No coordinator found: Starting new election")
+			s.startElection(ctx)
+		}
+
+		if s.Port != s.CoordinatorPort {
+			return &auction.BidResponse{}, fmt.Errorf("This is a backup server")
+		}
+
+	}
+
 	error := s.auction(request)
 	if error != nil {
 		return &auction.BidResponse{}, error
@@ -108,10 +143,6 @@ func (s *server) Result(_ context.Context, request *auction.ResultRequest) (*auc
 }
 
 func (s *server) auction(bid *auction.BidRequest) error {
-
-	if s.Port != s.CoordinatorPort {
-		return fmt.Errorf("This is a backup server")
-	}
 
 	if s.Done {
 		return fmt.Errorf("auction is done")
@@ -153,19 +184,23 @@ func (s *server) Election(_ context.Context, request *auction.ElectionMessage) (
 
 func (s *server) Coordinator(_ context.Context, request *auction.CoordinatorMessage) (*auction.Response, error) {
 	s.CoordinatorPort = int(request.Port)
+	log.Printf("Made Coordinator request " + strconv.Itoa(s.CoordinatorPort))
 
 	return &auction.Response{}, nil
 }
 
 func (s *server) client(ctx context.Context) {
 	go s.dialServers()
-	s.broadcastElection(ctx)
+	go s.broadcastElection(ctx)
+	time.Sleep(time.Second)
+	s.startElection(ctx)
+	for {
+
+	}
 }
 
 func (s *server) dialServers() {
 	for {
-		time.Sleep(time.Second)
-
 		for _, port := range s.Ports {
 			_, ok := s.Servers[port]
 
@@ -186,6 +221,7 @@ func (s *server) dialServers() {
 				s.BiggerServers[port] = server
 			}
 		}
+		time.Sleep(time.Second)
 	}
 }
 
@@ -198,9 +234,9 @@ func (s *server) broadcastElection(ctx context.Context) {
 
 func (s *server) startElection(ctx context.Context) {
 	response := false
-	for _, client := range s.BiggerServers {
+	for _, server := range s.BiggerServers {
 		ctx, cancel := context.WithTimeout(ctx, time.Second)
-		_, error := client.Election(ctx, &auction.ElectionMessage{})
+		_, error := server.Election(ctx, &auction.ElectionMessage{})
 
 		if error == nil {
 			response = true
@@ -210,14 +246,17 @@ func (s *server) startElection(ctx context.Context) {
 	}
 
 	if !response {
+		log.Printf("This is now the Coordinator")
 		coordinatorMessage := &auction.CoordinatorMessage{
 			Port: int32(s.Port),
 		}
 
-		for _, client := range s.Servers {
+		for _, server := range s.Servers {
+			log.Printf("Running...")
 			ctx, cancel := context.WithTimeout(ctx, time.Second)
-			_, _ = client.Coordinator(ctx, coordinatorMessage)
+			_, _ = server.Coordinator(ctx, coordinatorMessage)
 			cancel()
 		}
+		log.Printf(strconv.Itoa(s.CoordinatorPort))
 	}
 }
