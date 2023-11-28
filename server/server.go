@@ -97,11 +97,17 @@ func (s *server) Bid(ctx context.Context, request *auction.BidRequest) (*auction
 
 	if s.Port != s.CoordinatorPort {
 
-		log.Print("Attempting to connect to coordinator")
-		coordinator := s.Servers[s.CoordinatorPort]
-		_, error := coordinator.Election(ctx, &auction.ElectionMessage{})
+		var err error
 
-		if error != nil {
+		log.Print("Attempting to connect to coordinator")
+
+		coordinator, ok := s.Servers[s.CoordinatorPort]
+		if ok {
+			_, error := coordinator.Election(ctx, &auction.ElectionMessage{})
+			err = error
+		}
+
+		if err != nil {
 			log.Print("No coordinator found: Starting new election")
 			s.startElection(ctx)
 		}
