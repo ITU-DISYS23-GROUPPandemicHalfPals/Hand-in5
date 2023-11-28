@@ -20,7 +20,7 @@ type client struct {
 	Id   int
 	Name string
 
-	auction.AuctionClient
+	Clients []auction.AuctionClient
 }
 
 func Client(id int, name string) *client {
@@ -40,12 +40,14 @@ func main() {
 func (c *client) client() {
 	ctx := context.Background()
 
-	connection, error := grpc.Dial(":5000", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if error != nil {
-		log.Fatalf("Connecting to server failed: %s", error)
-	}
+	for i := 5000; i <= 5002; i++ {
+		connection, error := grpc.Dial(":"+strconv.Itoa(i), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if error != nil {
+			log.Fatalf("Connecting to server failed: %s", error)
+		}
 
-	c.AuctionClient = auction.NewAuctionClient(connection)
+		c.Clients = append(c.Clients, auction.NewAuctionClient(connection))
+	}
 
 	c.run(ctx)
 }
@@ -74,28 +76,67 @@ func (c *client) run(ctx context.Context) {
 }
 
 func (c *client) result(ctx context.Context) {
-	response, error := c.AuctionClient.Result(ctx, &auction.ResultRequest{})
-	if error != nil {
-		log.Print(error)
-		return
+	var responses map[string]int = make(map[string]int)
+	var mostOccuringResponse *auction.ResultResponse
+	var mostOcurrences int
+	var secondMostOcurrences int
+
+	for _, client := range c.Clients {
+		response, error := client.Result(ctx, &auction.ResultRequest{})
+		if error != nil {
+			continue
+		}
+
+		i, ok := responses[response.String()]
+		if ok {
+			responses[response.String()] = i + 1
+			if i+1 > mostOcurrences {
+				mostOccuringResponse = response
+				mostOcurrences = i + 1
+			} else if i+1 > secondMostOcurrences {
+				secondMostOcurrences = i + 1
+			}
+		} else {
+			responses[response.String()] = 1
+			if 1 > mostOcurrences {
+				mostOccuringResponse = response
+				mostOcurrences = 1
+			} else if 1 > secondMostOcurrences {
+				secondMostOcurrences = 1
+			}
+		}
 	}
 
-	switch event := response.Event.(type) {
-	case *auction.ResultResponse_Status:
-		log.Printf("The highest bid is %d. There are %d seconds left of the auction.", event.Status.HighestBid, event.Status.Time)
-	case *auction.ResultResponse_Winner:
-		log.Printf("The auction is over. The winning bid is %d by %s", event.Winner.Amount, event.Winner.Name)
+	if mostOccuringResponse == nil {
+		log.Printf("No response from the server")
+	} else if mostOcurrences > secondMostOcurrences {
+		switch event := mostOccuringResponse.Event.(type) {
+		case *auction.ResultResponse_Status:
+			log.Printf("The highest bid is %d. There are %d seconds left of the auction.", event.Status.HighestBid, event.Status.Time)
+		case *auction.ResultResponse_Winner:
+			log.Printf("The auction is over. The winning bid is %d by %s", event.Winner.Amount, event.Winner.Name)
+		}
+	} else {
+		log.Printf("Mismatched response from the server")
 	}
 }
 
 func (c *client) bid(ctx context.Context, bidAmount int) {
-	_, error := c.AuctionClient.Bid(ctx, &auction.BidRequest{
-		Id:     int32(c.Id),
-		Name:   c.Name,
-		Amount: int64(bidAmount),
-	})
-	if error != nil {
-		log.Print(error)
+	var errors []error
+	for _, client := range c.Clients {
+		_, error := client.Bid(ctx, &auction.BidRequest{
+			Id:     int32(c.Id),
+			Name:   c.Name,
+			Amount: int64(bidAmount),
+		})
+
+		if error != nil {
+			errors = append(errors, error)
+		}
+	}
+
+	if len(errors) != 0 {
+		log.Print(errors[len(errors)-1])
 	} else {
 		log.Print("Successfully placed bid")
 	}
