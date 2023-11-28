@@ -11,5 +11,5 @@
   For example: `go run . -id 1 -name John doe`.
   From here you can write two things in the command prompt:
 
-  Bid:      Write any integer to bid that amount.
-  Result:   Write `/result` to see server status or winner.
+  **Bid**:      Write any integer to bid that amount.  
+  **Result**:   Write `/result` to see server status or winner.
