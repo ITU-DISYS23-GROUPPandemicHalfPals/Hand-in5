@@ -122,13 +122,24 @@ func (c *client) result(ctx context.Context) {
 }
 
 func (c *client) bid(ctx context.Context, bidAmount int) {
+	var errors []error
 	for _, client := range c.Clients {
-		client.Bid(ctx, &auction.BidRequest{
+		_, error := client.Bid(ctx, &auction.BidRequest{
 			Id:     int32(c.Id),
 			Name:   c.Name,
 			Amount: int64(bidAmount),
 		})
+
+		if error != nil {
+			errors = append(errors, error)
+		}
 	}
 
-	log.Print("Successfully placed bid")
+	if len(errors) == 3 {
+		for _, error := range errors {
+			log.Print(error)
+		}
+	} else {
+		log.Printf("Successfully placed bid")
+	}
 }

@@ -140,9 +140,15 @@ func (s *server) timer() {
 
 	}
 
+	log.Printf("Time started")
+
 	for s.Time > 0 {
 		time.Sleep(time.Second)
 		s.Time--
+
+		if s.Time%10 == 0 {
+			log.Print(s.Time)
+		}
 	}
 
 	s.Finished = true
